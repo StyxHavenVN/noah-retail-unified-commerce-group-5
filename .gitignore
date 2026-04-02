@@ -1,0 +1,14 @@
+# Bỏ qua thư mục Database Volumes (Rất quan trọng để không làm nặng Repo)
+mysql_data/
+postgres_data/
+mongo_data/
+
+# Bỏ qua file môi trường và cache của Python
+.env
+__pycache__/
+venv/
+*.pyc
+
+# Bỏ qua các file CSV rác trong quá trình chạy (chỉ giữ file mẫu nếu cần)
+/app/input/*.csv
+/app/processed/*.csv
