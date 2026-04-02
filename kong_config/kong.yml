@@ -1,0 +1,50 @@
+_format_version: "2.1"
+_transform: true
+
+# 1. Định nghĩa Service (Backend nằm ở đâu?)
+services:
+  - name: order-service
+    url: http://order_api:5000
+    
+    # 2. Định nghĩa Route (Đường dẫn dẫn vào Service này)
+    routes:
+      - name: order-route
+        paths:
+          - /orders
+        # Lưu ý: Bạn có thể cần cấu hình 'strip_path: true' 
+        strip_path: true
+        # để chuyển tiếp đúng vào /api/private ở backend
+
+    # 3. Kích hoạt Plugin bảo mật cho Service này
+    plugins:
+      - name: key-auth
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+
+  - name: report-service
+    url: http://report_api:5000
+    
+    # 2. Định nghĩa Route (Đường dẫn dẫn vào Service này)
+    routes:
+      - name: report-route
+        paths:
+          - /report
+        # Lưu ý: Bạn có thể cần cấu hình 'strip_path: true' 
+        strip_path: true
+        # để chuyển tiếp đúng vào /api/private ở backend
+
+    # 3. Kích hoạt Plugin bảo mật cho Service này
+    plugins:
+      - name: key-auth
+      - name: rate-limiting
+        config:
+          minute: 5
+          policy: local
+
+# 4. Định nghĩa Khách hàng (Consumers) và Key
+consumers:
+  - username: noah_client
+    keyauth_credentials:
+      - key: noah-secret-key-2026
