@@ -9,7 +9,7 @@ INPUT_DIR = "/app/input"
 PROCESSED_DIR = "/app/processed"
 
 DB_CONFIG = {
-    "host": "mysql_db",   # nhớ trùng với docker-compose
+    "host": "mysql_db",   
     "user": "root",
     "password": "rootpassword",
     "database": "noah_web_store"
@@ -50,7 +50,7 @@ def process_file(filepath, conn):
                         raise ValueError("Negative stock")
 
                     cursor.execute(
-                        "UPDATE products SET quantity = %s WHERE product_id = %s",
+                        "UPDATE products SET stock = %s WHERE id = %s",
                         (quantity, product_id)
                     )
 
@@ -61,14 +61,14 @@ def process_file(filepath, conn):
                     print(f"[SKIPPED] {row} -> {e}")
 
         conn.commit()
-
-        print(f"[INFO] Processed {processed} records, Skipped {skipped} records")
+        cursor.close()
+        print(f"[INFO] Processed {processed} records. Skipped {skipped} invalid records.")
 
     except Exception as e:
         print(f"❌ File error: {e}")
 
     finally:
-        # LUÔN move để tránh loop vô hạn
+        # Luôn move để tránh loop vô hạn
         shutil.move(filepath, os.path.join(PROCESSED_DIR, filename))
         print(f"📦 Moved {filename} to processed")
 
