@@ -1,50 +1,78 @@
-_format_version: "2.1"
-_transform: true
+_format_version: "3.0"
 
-# 1. Định nghĩa Service (Backend nằm ở đâu?)
 services:
+  # 1. Order Service
   - name: order-service
-    url: http://order_api:5000
-    
-    # 2. Định nghĩa Route (Đường dẫn dẫn vào Service này)
+    url: http://order-api:5000
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+    retries: 3
+
     routes:
       - name: order-route
         paths:
-          - /orders
-        # Lưu ý: Bạn có thể cần cấu hình 'strip_path: true' 
-        strip_path: true
-        # để chuyển tiếp đúng vào /api/private ở backend
+          - /api/orders
+        strip_path: false
 
-    # 3. Kích hoạt Plugin bảo mật cho Service này
     plugins:
       - name: key-auth
+
       - name: rate-limiting
         config:
-          minute: 5
+          minute: 10
           policy: local
 
+      - name: cors
+        config:
+          origins:
+            - "*"
+          headers:
+            - Content-Type
+            - Authorization
+            - apikey
+          methods:
+            - GET
+            - POST
+            - OPTIONS
+
+  # 2. Report Service
   - name: report-service
-    url: http://report_api:5000
-    
-    # 2. Định nghĩa Route (Đường dẫn dẫn vào Service này)
+    url: http://report-api:5001
+    connect_timeout: 60000
+    read_timeout: 60000
+    write_timeout: 60000
+    retries: 3
+
     routes:
       - name: report-route
         paths:
-          - /report
-        # Lưu ý: Bạn có thể cần cấu hình 'strip_path: true' 
-        strip_path: true
-        # để chuyển tiếp đúng vào /api/private ở backend
+          - /api/report
+        strip_path: false
 
-    # 3. Kích hoạt Plugin bảo mật cho Service này
     plugins:
       - name: key-auth
+
       - name: rate-limiting
         config:
-          minute: 5
+          minute: 10
           policy: local
 
-# 4. Định nghĩa Khách hàng (Consumers) và Key
+      - name: cors
+        config:
+          origins:
+            - "*"
+          headers:
+            - Content-Type
+            - Authorization
+            - apikey
+          methods:
+            - GET
+            - POST
+            - OPTIONS
+
+# 3. Consumer (Client)
 consumers:
-  - username: noah_client
+  - username: frontend-dashboard
     keyauth_credentials:
-      - key: noah-secret-key-2026
+      - key: noah-secret-key
