@@ -43,6 +43,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - noah_network
 
@@ -119,7 +120,7 @@ services:
     networks:
       - noah_network
 
-  # 6. Report API
+  # 6. Report API – Data Stitching (MySQL + PostgreSQL)
   report-api:
     build:
       context: ./report_api
@@ -138,7 +139,7 @@ services:
     networks:
       - noah_network
 
-  # 7. Streamlit Dashboard
+  # 7. Streamlit Dashboard (Module 6 – Premium UI)
   dashboard:
     build:
       context: ./dashboard
@@ -147,7 +148,9 @@ services:
     depends_on:
       - kong-gateway
     environment:
-      REPORT_API_URL: http://kong-gateway:8000
+      REPORT_API_URL: http://kong-gateway:8000/report
+      USE_MOCK: "true"
+      API_KEY: noah-secret-key
     ports:
       - "8501:8501"
     networks:

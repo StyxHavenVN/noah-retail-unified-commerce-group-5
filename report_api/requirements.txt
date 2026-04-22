@@ -1,5 +1,6 @@
-flask==3.0.3
+Flask
 pandas==2.2.2
+numpy<2
 sqlalchemy==2.0.30
 mysql-connector-python==8.4.0
 psycopg2-binary==2.9.9
