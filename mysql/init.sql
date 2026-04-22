@@ -20224,4 +20224,5 @@ INSERT INTO orders (user_id, product_id, quantity, total_price, status, created_
 (515, 213, 3, 768000, 'PENDING', '2026-02-03 03:34:05'),
 (738, 291, 3, 1500000, 'PENDING', '2026-01-31 08:07:05'),
 (348, 246, 5, 1785000, 'PENDING', '2026-01-18 11:28:05');
-INSERT INTO orders (user_id, product_id, quantity, total_price, status, created_at) VALUES
+GRANT ALL PRIVILEGES ON webstore_db.* TO 'noah_user'@'%';
+FLUSH PRIVILEGES;
