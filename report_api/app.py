@@ -21,7 +21,7 @@ POSTGRES_CONFIG = {
     'database': 'noah_finance'
 }
 
-MYSQL_QUERY = "SELECT order_id, product_name, status FROM orders WHERE status = 'Success'"
+MYSQL_QUERY = "SELECT o.id AS order_id, p.name AS product_name, o.status FROM orders o JOIN products p ON o.product_id = p.id WHERE o.status = 'Success'"
 POSTGRES_QUERY = "SELECT order_id, quantity, unit_price FROM transactions"
 
 def get_stitched_report():

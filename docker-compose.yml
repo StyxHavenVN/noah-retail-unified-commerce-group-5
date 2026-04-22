@@ -38,6 +38,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - noah_network
 
@@ -78,6 +79,30 @@ services:
       - "8001:8001" # Cổng Admin (Quản trị)
     networks:
       - noah_network
+  # 6. REPORT API – Data Stitching (MySQL + PostgreSQL)
+  report_api:
+    build: ./report_api
+    container_name: noah_report_api
+    # KHÔNG expose port ra ngoài → chỉ dashboard gọi nội bộ
+    networks:
+      - noah_network
+    depends_on:
+      - mysql_db
+      - postgres_db
+ 
+  # 7. DASHBOARD – Streamlit UI (Module 6)
+  dashboard:
+    build: ./dashboard
+    container_name: noah_dashboard
+    ports:
+      - "8501:8501"     # Mở trình duyệt: http://localhost:8501
+    environment:
+      - REPORT_API_URL=http://kong:8000/report
+      - USE_MOCK=false
+    networks:
+      - noah_network
+    depends_on:
+      - report_api
 
   order_api:
     build:
