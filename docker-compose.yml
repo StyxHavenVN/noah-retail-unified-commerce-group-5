@@ -1,39 +1,44 @@
-version: "3.8"
-
-# Định nghĩa mạng nội bộ để các container giao tiếp bằng tên (DNS)
-networks:
-  noah_network:
-    driver: bridge
-
-# Khai báo Volumes để dữ liệu không bị mất khi tắt Docker
-volumes:
-  mysql_data:
-  postgres_data:
-  # mongo_data: # Bỏ comment nếu làm Bonus Audit Log
-
 services:
-  # 1. DATABASE HỆ THỐNG BÁN HÀNG
-  mysql_db:
-    image: mysql:8
+  # 1. MySQL
+  mysql-db:
+    image: mysql:8.0
     container_name: noah_mysql
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: noah_web_store
-    volumes:
-      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3307:3306"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
     networks:
       - noah_network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uroot",
+          "-prootpassword",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-  # 2. DATABASE HỆ THỐNG TÀI CHÍNH
-  postgres_db:
-    image: postgres:15
+  # 2. PostgreSQL
+  postgres-db:
+    image: postgres:15-alpine
     container_name: noah_postgres
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: adminpassword
-      POSTGRES_DB: noah_finance
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -41,63 +46,153 @@ services:
     networks:
       - noah_network
 
-  # 3. MESSAGE BROKER
+  # 3. RabbitMQ
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3-management-alpine
     container_name: noah_rabbitmq
-    ports:
-      - "5672:5672" # Cổng giao tiếp Message
-      - "15672:15672" # Cổng giao diện UI quản lý (truy cập trình duyệt)
-    networks:
-      - noah_network
-
-  # 4. Backend Service (Mục tiêu cần bảo vệ)
-  backend_container:
-    build: ./backend
-    # Lưu ý: KHÔNG expose cổng 5000 ra máy thật (ports).
-    # Chỉ Kong mới nhìn thấy Backend này. (Isolation)
-    networks:
-      - noah_network
-
-  # 5. Kong Gateway (Người bảo vệ)
-  kong:
-    image: kong:2.8
-    container_name: noah_kong
-    volumes:
-      - ./kong_config:/kong/declarative # Nạp file cấu hình vào
     environment:
-      - KONG_DATABASE=off # Chế độ không DB
-      - KONG_DECLARATIVE_CONFIG=/kong/declarative/kong.yml
-      - KONG_PROXY_ACCESS_LOG=/dev/stdout
-      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
-      - KONG_PROXY_ERROR_LOG=/dev/stderr
-      - KONG_ADMIN_ERROR_LOG=/dev/stderr
-      - KONG_ADMIN_LISTEN=0.0.0.0:8001, 0.0.0.0:8444 ssl
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports:
-      - "8000:8000" # Cổng chính để Client gọi vào (Proxy)
-      - "8001:8001" # Cổng Admin (Quản trị)
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - noah_network
 
-  order_api:
+  # 4. Order API
+  order-api:
     build:
-      context: ./order_service # Thư mục chứa Dockerfile và app.py
-    container_name: noah_order_api
+      context: ./module2_api/server
+      dockerfile: Dockerfile
+    container_name: order_api
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    environment:
+      MYSQL_HOST: mysql-db
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports:
       - "5000:5000"
     networks:
       - noah_network
-    depends_on:
-      - mysql_db
-      - rabbitmq
 
-  legacy_adapter:
-    build: ./legacy_adapter
-    container_name: legacy_adapter
+  # 5. Worker
+  order-worker:
+    build:
+      context: ./module2_worker
+      dockerfile: Dockerfile
+    container_name: order_worker
     depends_on:
-      - mysql_db
-    volumes:
-      - ./legacy_adapter/input:/app/input
-      - ./legacy_adapter/processed:/app/processed
+      mysql-db:
+        condition: service_healthy
+      postgres-db:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    environment:
+      MYSQL_HOST: mysql-db
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+
+      POSTGRES_HOST: postgres-db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
     networks:
       - noah_network
+
+  # 6. Client
+  client:
+    build:
+      context: ./module2_api/client
+      dockerfile: Dockerfile
+    container_name: order_client
+    depends_on:
+      - order-api
+    networks:
+      - noah_network
+    restart: "no"
+
+  # 7. Report API (Module 3)
+  report-api:
+    build:
+      context: ./module3_reporting
+      dockerfile: Dockerfile
+    container_name: report_api
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+      postgres-db:
+        condition: service_started
+    environment:
+      MYSQL_URL: mysql+mysqlconnector://noah_user:noah_password@mysql-db:3306/webstore_db
+      POSTGRES_URL: postgresql+psycopg2://finance_user:finance_password@postgres-db:5432/finance_db
+    ports:
+      - "5001:5001"
+    networks:
+      - noah_network
+
+  # 8. Streamlit Dashboard (Frontend)
+  dashboard:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: noah_dashboard
+    depends_on:
+      - report-api
+    environment:
+      REPORT_API_URL: http://kong-gateway:8000
+    ports:
+      - "8501:8501"
+    networks:
+      - noah_network
+
+  # 9. Kong API Gateway (DB-less mode)
+  kong-gateway:
+    image: kong:3.4-ubuntu
+    container_name: kong_gateway
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+    volumes:
+      - ./kong.yml:/kong/declarative/kong.yml
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    depends_on:
+      - order-api
+      - report-api
+    networks:
+      - noah_network
+
+networks:
+  noah_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  postgres_data:
+  rabbitmq_data:
