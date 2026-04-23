@@ -101,3 +101,14 @@ services:
       - ./legacy_adapter/processed:/app/processed
     networks:
       - noah_network
+  # 6. REPORTING API (Module 4 - Võ Ngọc Phú)
+  report_api:
+    build: ./report_api
+    container_name: noah_report_api
+    ports:
+      - "5001:5000" # Map cổng 5000 trong container ra 5001 ở máy thật (tránh trùng với Hào)
+    depends_on:
+      - mysql_db
+      - postgres_db
+    networks:
+      - noah_network # Phải cùng mạng để Service Discovery hoạt động [cite: 43, 105]

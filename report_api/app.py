@@ -21,22 +21,28 @@ POSTGRES_CONFIG = {
     'database': 'noah_finance'
 }
 
-MYSQL_QUERY = "SELECT order_id, product_name, status FROM orders WHERE status = 'Success'"
-POSTGRES_QUERY = "SELECT order_id, quantity, unit_price FROM transactions"
-
+MYSQL_QUERY_PRODUCTS = "SELECT id, name AS product_name FROM products"
+MYSQL_QUERY_ORDERS = "SELECT product_id, quantity, total_price FROM orders"
 def get_stitched_report():
     try:
-        conn_mysql = mysql.connector.connect(**MYSQL_CONFIG)
-        df_products = pd.read_sql(MYSQL_QUERY, conn_mysql)
-        conn_mysql.close()
+        # Kết nối tới MySQL (Chỉ cần 1 kết nối duy nhất)
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        
+        df_products = pd.read_sql(MYSQL_QUERY_PRODUCTS, conn)
+        df_orders = pd.read_sql(MYSQL_QUERY_ORDERS, conn)
+        
+        conn.close()
 
-        conn_pg = psycopg2.connect(**POSTGRES_CONFIG)
-        df_transactions = pd.read_sql(POSTGRES_QUERY, conn_pg)
-        conn_pg.close()
+        # KHÂU DỮ LIỆU: id của bảng products gộp với product_id của bảng orders
+        merged_df = pd.merge(
+            df_products, 
+            df_orders, 
+            left_on='id', 
+            right_on='product_id', 
+            how='inner'
+        )
 
-        merged_df = pd.merge(df_transactions, df_products, on='order_id', how='inner')
-
-        merged_df['total_revenue'] = merged_df['quantity'] * merged_df['unit_price']
+        merged_df['total_revenue'] = merged_df['quantity'] * merged_df['total_price']
 
         return merged_df.to_dict(orient='records')
         

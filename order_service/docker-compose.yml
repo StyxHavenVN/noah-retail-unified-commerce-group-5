@@ -101,14 +101,4 @@ services:
       - ./legacy_adapter/processed:/app/processed
     networks:
       - noah_network
-# 6. REPORTING API
-    report_api:
-        build: ./report_api
-        container_name: noah_report_api
-        ports:
-          - "5001:5000"
-        depends_on:
-          - mysql_db
-          - postgres_db
-        networks:
-          - noah_network
+
