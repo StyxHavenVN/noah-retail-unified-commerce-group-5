@@ -16,7 +16,16 @@ services:
     networks:
       - noah_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uroot",
+          "-prootpassword",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -122,20 +131,8 @@ services:
       postgres-db:
         condition: service_started
     environment:
-<<<<<<< HEAD
       MYSQL_URL: mysql+mysqlconnector://noah_user:noah_password@mysql-db:3306/webstore_db
       POSTGRES_URL: postgresql+psycopg2://finance_user:finance_password@postgres-db:5432/finance_dbdocker-compose logs report-api
-=======
-      MYSQL_HOST: mysql-db
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-
-      POSTGRES_HOST: postgres-db
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
->>>>>>> 22a0e755b13d2bb6687c65e0d681be2900e8096d
     ports:
       - "5001:5001"
     networks:
