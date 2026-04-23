@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NOAH Retail - Unified Commerce</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+  </head>
+  <body class="bg-gray-100 font-sans text-gray-800">
+    <nav class="bg-blue-900 text-white p-4 shadow-md">
+      <div class="container mx-auto flex justify-between items-center">
+        <h1 class="text-2xl font-bold flex items-center gap-2">
+          <i data-lucide="layout-dashboard"></i> NOAH Retail Dashboard
+        </h1>
+        <div class="text-sm bg-blue-800 px-3 py-1 rounded">
+          Đồ án môn học: CMU-CS 445 | Nhóm 5
+        </div>
+      </div>
+    </nav>
+
+    <div class="container mx-auto p-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500"
+        >
+          <h3 class="text-gray-500 text-sm font-semibold uppercase">
+            Tổng Đơn Hàng Đã Xử Lý
+          </h3>
+          <p class="text-3xl font-bold text-gray-800 mt-2" id="totalOrders">
+            Đang tải...
+          </p>
+        </div>
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500"
+        >
+          <h3 class="text-gray-500 text-sm font-semibold uppercase">
+            Trạng Thái Hệ Thống
+          </h3>
+          <p
+            class="text-2xl font-bold text-green-600 mt-2 flex items-center gap-2"
+          >
+            <i data-lucide="check-circle"></i> Đồng bộ 100%
+          </p>
+        </div>
+        <div
+          class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-purple-500"
+        >
+          <h3 class="text-gray-500 text-sm font-semibold uppercase">
+            Module Tích Hợp
+          </h3>
+          <p class="text-lg font-bold text-gray-800 mt-2">MySQL + PostgreSQL</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div class="bg-white p-6 rounded-xl shadow-sm">
+          <h2
+            class="text-lg font-bold mb-4 text-gray-700 flex items-center gap-2"
+          >
+            <i data-lucide="bar-chart-2"></i> Doanh Thu Theo Khách Hàng (Từ
+            Postgres)
+          </h2>
+          <canvas id="revenueChart" height="200"></canvas>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl shadow-sm flex flex-col h-full">
+          <h2
+            class="text-lg font-bold mb-4 text-gray-700 flex items-center gap-2"
+          >
+            <i data-lucide="table"></i> Đối Soát Đơn Hàng (Data Stitching)
+          </h2>
+          <div class="overflow-x-auto flex-grow">
+            <table class="min-w-full text-left text-sm whitespace-nowrap">
+              <thead class="bg-gray-100 text-gray-600">
+                <tr>
+                  <th class="p-3">Mã ĐH</th>
+                  <th class="p-3">Sản Phẩm</th>
+                  <th class="p-3">Trạng Thái Web (MySQL)</th>
+                  <th class="p-3">Trạng Thái Tiền (Postgres)</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody" class="divide-y divide-gray-100">
+                <tr>
+                  <td colspan="4" class="p-4 text-center text-gray-500">
+                    Đang tải dữ liệu từ API...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      lucide.createIcons();
+
+      fetch("http://localhost:8000/api/report", {
+        method: "GET",
+        headers: {
+          apikey: "noah-secret-key",
+        },
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          // 1. Cập nhật tổng đơn hàng
+          document.getElementById("totalOrders").innerText =
+            data.total_orders_analyzed;
+
+          // 2. Vẽ biểu đồ — dùng đúng field total_revenue
+          const users = data.revenue_by_user.map(
+            (item) => `User ${item.customer_id}`,
+          );
+          const revenues = data.revenue_by_user.map(
+            (item) => item.total_revenue, // ← sửa từ total_spent → total_revenue
+          );
+
+          new Chart(document.getElementById("revenueChart"), {
+            type: "bar",
+            data: {
+              labels: users,
+              datasets: [
+                {
+                  label: "Tổng chi tiêu (VNĐ)",
+                  data: revenues,
+                  backgroundColor: "rgba(168, 85, 247, 0.6)",
+                  borderColor: "rgba(168, 85, 247, 1)",
+                  borderWidth: 1,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { position: "top" },
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: (value) =>
+                      new Intl.NumberFormat("vi-VN").format(value),
+                  },
+                },
+              },
+            },
+          });
+
+          // 3. Đổ dữ liệu vào bảng
+          const tbody = document.getElementById("tableBody");
+          tbody.innerHTML = "";
+
+          const recentOrders = data.recent_orders.slice(0, 10);
+
+          recentOrders.forEach((order) => {
+            const financeStatus =
+              order.finance_status === "Chờ"
+                ? "CHỜ"
+                : order.finance_status || "CHỜ";
+            const row = `
+              <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                <td class="p-3 font-bold text-blue-600">#${order.order_id}</td>
+                <td class="p-3">Sản phẩm ${order.product_id}</td>
+                <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-800">${order.web_status}</span></td>
+                <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">${financeStatus}</span></td>
+              </tr>
+            `;
+            tbody.innerHTML += row;
+          });
+        })
+        .catch((error) => {
+          console.error("Lỗi khi tải dữ liệu:", error);
+          document.getElementById("tableBody").innerHTML =
+            '<tr><td colspan="4" class="p-4 text-center text-red-500">Không thể kết nối đến API Report!</td></tr>';
+        });
+    </script>
+  </body>
+</html>
