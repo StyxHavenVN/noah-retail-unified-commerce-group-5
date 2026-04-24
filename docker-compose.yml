@@ -132,7 +132,7 @@ services:
         condition: service_started
     environment:
       MYSQL_URL: mysql+mysqlconnector://noah_user:noah_password@mysql-db:3306/webstore_db
-      POSTGRES_URL: postgresql+psycopg2://finance_user:finance_password@postgres-db:5432/finance_dbdocker-compose logs report-api
+      POSTGRES_URL: postgresql+psycopg2://finance_user:finance_password@postgres-db:5432/finance_db
     ports:
       - "5001:5001"
     networks:
