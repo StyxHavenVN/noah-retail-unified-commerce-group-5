@@ -91,7 +91,7 @@ def publish_to_rabbitmq(message: dict):
 # =============================================
 # POST /api/orders — Tạo đơn hàng mới
 # =============================================
-@app.route('/api/orders', methods=['POST'])
+@app.route("/api/orders", methods=["POST"])
 def create_order():
     data = request.get_json()
     if not data:

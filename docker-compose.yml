@@ -176,6 +176,26 @@ services:
     networks:
       - noah_network
 
+  # 9. Legacy Adapter (Thu An)
+  legacy-adapter:
+    build:
+      context: ./legacy_adapter
+    container_name: legacy_adapter
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql-db
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - ./legacy_adapter/input:/app/input
+      - ./legacy_adapter/processed:/app/processed
+    networks:
+      - noah_network
+
 networks:
   noah_network:
     driver: bridge

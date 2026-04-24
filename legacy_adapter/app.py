@@ -8,11 +8,13 @@ from mysql.connector import Error
 INPUT_DIR = "/app/input"
 PROCESSED_DIR = "/app/processed"
 
+# --- SỬA Ở ĐÂY: Đọc cấu hình từ biến môi trường của Docker Compose ---
 DB_CONFIG = {
-    "host": "mysql_db",   
-    "user": "root",
-    "password": "rootpassword",
-    "database": "noah_web_store"
+    "host": os.environ.get("MYSQL_HOST", "mysql-db"),   
+    "user": os.environ.get("MYSQL_USER", "root"),
+    "password": os.environ.get("MYSQL_PASSWORD", "rootpassword"),
+    "database": os.environ.get("MYSQL_DATABASE", "noah_web_store"),
+    "port": int(os.environ.get("MYSQL_PORT", 3306))
 }
 
 # --- KẾT NỐI DB (RETRY) ---
