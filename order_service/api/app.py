@@ -5,6 +5,8 @@ import psycopg
 import pandas as pd
 import os
 import time
+import pika
+import json
 from decimal import Decimal
 
 app = Flask(__name__)
@@ -29,17 +31,22 @@ POSTGRES_CONFIG = {
     "dbname": os.environ.get("POSTGRES_DB", "finance_db"),
 }
 
+RABBITMQ_CONFIG = {
+    "host": os.environ.get("RABBITMQ_HOST", "rabbitmq"),
+    "credentials": pika.PlainCredentials(
+        os.environ.get("RABBITMQ_USER", "user"),
+        os.environ.get("RABBITMQ_PASS", "password"),
+    ),
+}
+
 # =============================================
-# HELPER: XỬ LÝ DỮ LIỆU SỐ & NULL
+# HELPER
 # =============================================
 def convert_value(v):
     if isinstance(v, Decimal):
-        return float(v) # Chuyển Decimal sang float để JSON nhận diện được
+        return float(v)
     return v
 
-# =============================================
-# DATABASE RETRY HELPERS
-# =============================================
 def get_mysql_connection(retries=5, delay=5):
     for attempt in range(1, retries + 1):
         try:
@@ -48,7 +55,8 @@ def get_mysql_connection(retries=5, delay=5):
             return conn
         except Exception as e:
             print(f"[WARN] MySQL not ready ({attempt}/{retries}): {e}")
-            if attempt < retries: time.sleep(delay)
+            if attempt < retries:
+                time.sleep(delay)
     return None
 
 def get_postgres_connection(retries=5, delay=5):
@@ -59,13 +67,139 @@ def get_postgres_connection(retries=5, delay=5):
             return conn
         except Exception as e:
             print(f"[WARN] Postgres not ready ({attempt}/{retries}): {e}")
-            if attempt < retries: time.sleep(delay)
+            if attempt < retries:
+                time.sleep(delay)
     return None
 
+def publish_to_rabbitmq(message: dict):
+    try:
+        conn = pika.BlockingConnection(pika.ConnectionParameters(**RABBITMQ_CONFIG))
+        channel = conn.channel()
+        channel.queue_declare(queue="order_queue", durable=True)
+        channel.basic_publish(
+            exchange="",
+            routing_key="order_queue",
+            body=json.dumps(message),
+            properties=pika.BasicProperties(delivery_mode=2),
+        )
+        conn.close()
+        print(f"[INFO] Published to RabbitMQ: {message}")
+    except Exception as e:
+        print(f"[WARN] RabbitMQ publish failed: {e}")
+
+
 # =============================================
-# GET /api/report
+# POST /api/orders — Tạo đơn hàng mới
 # =============================================
-@app.route('/api/report', methods=['GET'])
+@app.route("/api/orders", methods=["POST"])
+def create_order():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing JSON body"}), 400
+
+    user_id    = data.get("user_id")
+    product_id = data.get("product_id")
+    quantity   = data.get("quantity", 1)
+
+    if not user_id or not product_id:
+        return jsonify({"error": "user_id and product_id are required"}), 400
+
+    conn = get_mysql_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed"}), 503
+
+    try:
+        cursor = conn.cursor()
+
+        # Tính total_price đơn giản: quantity * 100000 (giả định đơn giá)
+        total_price = quantity * 100000
+
+        cursor.execute(
+            """
+            INSERT INTO orders (user_id, product_id, quantity, total_price, status)
+            VALUES (%s, %s, %s, %s, 'PENDING')
+            """,
+            (user_id, product_id, quantity, total_price),
+        )
+        conn.commit()
+        order_id = cursor.lastrowid
+
+        # Gửi message vào RabbitMQ để worker xử lý
+        publish_to_rabbitmq({
+            "order_id":   order_id,
+            "user_id":    user_id,
+            "product_id": product_id,
+            "quantity":   quantity,
+            "amount":     total_price,
+        })
+
+        return jsonify({
+            "message":  "Order created successfully",
+            "order_id": order_id,
+            "status":   "PENDING",
+        }), 201
+
+    except Exception as e:
+        print(f"[ERROR] create_order: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# =============================================
+# GET /api/orders — Lấy danh sách đơn hàng
+# =============================================
+@app.route("/api/orders", methods=["GET"])
+def get_orders():
+    try:
+        page  = max(1, int(request.args.get("page", 1)))
+        limit = min(100, max(1, int(request.args.get("limit", 10))))
+    except ValueError:
+        return jsonify({"error": "page and limit must be integers"}), 400
+
+    offset = (page - 1) * limit
+
+    conn = get_mysql_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed"}), 503
+
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT id, user_id, product_id, quantity, total_price, status, created_at FROM orders ORDER BY id DESC LIMIT %s OFFSET %s",
+            (limit, offset),
+        )
+        orders = cursor.fetchall()
+
+        cursor.execute("SELECT COUNT(*) as total FROM orders")
+        total = cursor.fetchone()["total"]
+
+        # Chuyển Decimal sang float
+        for order in orders:
+            for k, v in order.items():
+                order[k] = convert_value(v)
+            # Chuyển datetime sang string
+            if order.get("created_at"):
+                order["created_at"] = str(order["created_at"])
+
+        return jsonify({
+            "page":    page,
+            "limit":   limit,
+            "total":   total,
+            "orders":  orders,
+        }), 200
+
+    except Exception as e:
+        print(f"[ERROR] get_orders: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
+# =============================================
+# GET /api/report — Báo cáo tổng hợp
+# =============================================
+@app.route("/api/report", methods=["GET"])
 def generate_report():
     my_conn = get_mysql_connection()
     pg_conn = get_postgres_connection()
@@ -74,33 +208,19 @@ def generate_report():
         return jsonify({"error": "Service Unavailable: Database connection failed"}), 503
 
     try:
-        # 1. Rút dữ liệu từ MySQL (Limit để đảm bảo hiệu năng)
         query_mysql = "SELECT id as order_id, user_id, product_id, quantity, status as web_status FROM orders ORDER BY id DESC LIMIT 100"
         df_mysql = pd.read_sql(query_mysql, my_conn)
 
-        # 2. Rút dữ liệu từ PostgreSQL
-        query_postgres = "SELECT order_id, amount, status as finance_status FROM finance_transactions"
+        query_postgres = "SELECT order_id, user_id FROM transactions"
         df_postgres = pd.read_sql(query_postgres, pg_conn)
 
-        # 3. DATA STITCHING (Pandas Merge)
-        df_merged = pd.merge(df_mysql, df_postgres, on='order_id', how='left')
-
-        # Xử lý các giá trị trống và số Decimal
-        df_merged['amount'] = df_merged['amount'].fillna(0).apply(convert_value)
+        df_merged = pd.merge(df_mysql, df_postgres, on="order_id", how="left")
         df_merged.fillna("", inplace=True)
-        
-        # 4. TÍNH TOÁN DOANH THU (Aggregation)
-        df_revenue = df_merged.groupby('user_id')['amount'].sum().reset_index()
-        df_revenue.rename(columns={'amount': 'total_spent'}, inplace=True)
 
-        # Chuyển đổi dữ liệu sang Dictionary để trả về JSON
-        report_data = {
+        return jsonify({
             "total_orders_analyzed": len(df_merged),
-            "recent_orders": df_merged.to_dict(orient='records'),
-            "revenue_by_user": df_revenue.to_dict(orient='records')
-        }
-
-        return jsonify(report_data), 200
+            "recent_orders":         df_merged.to_dict(orient="records"),
+        }), 200
 
     except Exception as e:
         print(f"[ERROR] {e}")
@@ -109,10 +229,18 @@ def generate_report():
         if my_conn: my_conn.close()
         if pg_conn: pg_conn.close()
 
+
+# =============================================
+# HEALTH CHECK
+# =============================================
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "service": "order-api"}), 200
+
+
 # =============================================
 # MAIN
 # =============================================
-if __name__ == '__main__':
-    print("[INFO] Initializing Reporting API...")
-    # Chạy ở port 5001 (Khớp với cấu hình Kong và Docker Compose)
-    app.run(host='0.0.0.0', port=5001)
+if __name__ == "__main__":
+    print("[INFO] Initializing Order API...")
+    app.run(host="0.0.0.0", port=5000)
