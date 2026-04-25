@@ -148,9 +148,8 @@ services:
     depends_on:
       - kong-gateway
     environment:
-      REPORT_API_URL: http://kong-gateway:8000/report
-      USE_MOCK: "true"
-      API_KEY: noah-secret-key
+      KONG_URL: http://kong-gateway:8000
+      KONG_API_KEY: noah-secret-key
     ports:
       - "8501:8501"
     networks:
