@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import pandas as pd
 from sqlalchemy import create_engine, text
 import os
@@ -6,6 +7,7 @@ import time
 from datetime import datetime
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # =============================================
 # CẤU HÌNH KẾT NỐI

@@ -20,7 +20,7 @@ services:
 
       - name: rate-limiting
         config:
-          minute: 10
+          minute: 100   # FIX #8: tăng từ 10 lên 100 để khớp với tài liệu và tránh tự rate-limit dashboard
           policy: local
 
       - name: cors
@@ -55,7 +55,7 @@ services:
 
       - name: rate-limiting
         config:
-          minute: 10
+          minute: 100   # FIX #8: tăng từ 10 lên 100
           policy: local
 
       - name: cors
