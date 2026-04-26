@@ -5,12 +5,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 import time
+import streamlit.components.v1 as components
+from ws_panel import WS_REALTIME_HTML
 
 # =============================================
 # CẤU HÌNH
 # =============================================
 KONG_URL = os.environ.get("KONG_URL", "http://kong-gateway:8000")
 API_KEY  = os.environ.get("KONG_API_KEY", "noah-secret-key")
+WS_SERVER_URL = os.environ.get("WS_SERVER_URL", "http://websocket-server:5002")
 
 HEADERS = {
     "apikey": API_KEY,
@@ -187,6 +190,12 @@ st.markdown("""
 
 
 # =============================================
+# =============================================
+# OPTION 4: REAL-TIME WEBSOCKET PANEL
+# =============================================
+components.html(WS_REALTIME_HTML, height=100)
+
+
 # PHẦN 1: METRIC CARDS
 # =============================================
 summary = fetch_summary()

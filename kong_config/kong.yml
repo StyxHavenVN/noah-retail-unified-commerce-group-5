@@ -15,12 +15,17 @@ services:
           - /api/orders
         strip_path: false
 
+      - name: products-route
+        paths:
+          - /api/products
+        strip_path: false
+
     plugins:
       - name: key-auth
 
       - name: rate-limiting
         config:
-          minute: 100   # FIX #8: tăng từ 10 lên 100 để khớp với tài liệu và tránh tự rate-limit dashboard
+          minute: 100
           policy: local
 
       - name: cors
@@ -55,7 +60,7 @@ services:
 
       - name: rate-limiting
         config:
-          minute: 100   # FIX #8: tăng từ 10 lên 100
+          minute: 100
           policy: local
 
       - name: cors
@@ -71,8 +76,8 @@ services:
             - POST
             - OPTIONS
 
-# 3. Consumer (Client)
+# 3. Consumers (Clients)
 consumers:
   - username: frontend-dashboard
     keyauth_credentials:
-      - key: noah-secret-key
+      - key: noah-secret-key

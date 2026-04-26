@@ -7,6 +7,7 @@ import os
 import time
 import pika
 import json
+import requests as http_requests
 from decimal import Decimal
 
 app = Flask(__name__)
@@ -38,6 +39,9 @@ RABBITMQ_CONFIG = {
         os.environ.get("RABBITMQ_PASS", "password"),
     ),
 }
+
+# WebSocket Server URL (Option 4)
+WS_SERVER_URL = os.environ.get("WS_SERVER_URL", "http://websocket-server:5002")
 
 # =============================================
 # HELPER
@@ -84,6 +88,18 @@ def publish_to_rabbitmq(message: dict):
         )
         conn.close()
         print(f"[INFO] Published to RabbitMQ: {message}")
+
+        # Notify WebSocket server for real-time dashboard (Option 4)
+        try:
+            http_requests.post(
+                f"{WS_SERVER_URL}/notify/new_order",
+                json=message,
+                timeout=2,
+            )
+            print(f"[INFO] Notified WebSocket server")
+        except Exception as ws_err:
+            print(f"[WARN] WebSocket notify failed (non-critical): {ws_err}")
+
     except Exception as e:
         print(f"[WARN] RabbitMQ publish failed: {e}")
 
@@ -228,6 +244,52 @@ def generate_report():
     finally:
         if my_conn: my_conn.close()
         if pg_conn: pg_conn.close()
+
+
+# =============================================
+# GET /api/products — Danh sách sản phẩm (Option 5)
+# =============================================
+@app.route("/api/products", methods=["GET"])
+def get_products():
+    """Lấy danh sách sản phẩm từ MySQL cho Client Storefront."""
+    try:
+        limit = min(200, max(1, int(request.args.get("limit", 50))))
+        offset = max(0, int(request.args.get("offset", 0)))
+    except ValueError:
+        return jsonify({"error": "limit and offset must be integers"}), 400
+
+    conn = get_mysql_connection()
+    if not conn:
+        return jsonify({"error": "Database connection failed"}), 503
+
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT id, name, price, stock FROM products ORDER BY id ASC LIMIT %s OFFSET %s",
+            (limit, offset),
+        )
+        products = cursor.fetchall()
+
+        cursor.execute("SELECT COUNT(*) as total FROM products")
+        total = cursor.fetchone()["total"]
+
+        # Convert Decimal to float
+        for p in products:
+            for k, v in p.items():
+                p[k] = convert_value(v)
+
+        return jsonify({
+            "products": products,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }), 200
+
+    except Exception as e:
+        print(f"[ERROR] get_products: {e}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
 
 
 # =============================================
