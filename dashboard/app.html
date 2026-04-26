@@ -97,83 +97,137 @@
     <script>
       lucide.createIcons();
 
-      fetch("http://localhost:8000/api/report", {
-        method: "GET",
-        headers: {
-          apikey: "noah-secret-key",
-        },
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          // 1. Cập nhật tổng đơn hàng
-          document.getElementById("totalOrders").innerText =
-            data.total_orders_analyzed;
+      // ========================================
+      // Mock Data (for development/demo)
+      // ========================================
+      const MOCK_DATA = {
+        total_orders_analyzed: 125,
+        revenue_by_user: [
+          { customer_id: 1, total_revenue: 15000000 },
+          { customer_id: 2, total_revenue: 22500000 },
+          { customer_id: 3, total_revenue: 18900000 },
+          { customer_id: 4, total_revenue: 31200000 },
+          { customer_id: 5, total_revenue: 12800000 },
+        ],
+        recent_orders: [
+          { order_id: 1001, product_id: 101, web_status: "Hoàn thành", finance_status: "Đã thanh toán" },
+          { order_id: 1002, product_id: 102, web_status: "Hoàn thành", finance_status: "Đã thanh toán" },
+          { order_id: 1003, product_id: 103, web_status: "Đang xử lý", finance_status: "CHỜ" },
+          { order_id: 1004, product_id: 104, web_status: "Hoàn thành", finance_status: "Đã thanh toán" },
+          { order_id: 1005, product_id: 105, web_status: "Hoàn thành", finance_status: "Đã thanh toán" },
+          { order_id: 1006, product_id: 106, web_status: "Đang xử lý", finance_status: "CHỜ" },
+          { order_id: 1007, product_id: 107, web_status: "Hoàn thành", finance_status: "Đã thanh toán" },
+          { order_id: 1008, product_id: 108, web_status: "Hoàn thành", finance_status: "Đã thanh toán" },
+        ]
+      };
 
-          // 2. Vẽ biểu đồ — dùng đúng field total_revenue
-          const users = data.revenue_by_user.map(
-            (item) => `User ${item.customer_id}`,
-          );
-          const revenues = data.revenue_by_user.map(
-            (item) => item.total_revenue, // ← sửa từ total_spent → total_revenue
-          );
+      // ========================================
+      // API Configuration
+      // ========================================
+      const API_BASE_URL = "http://localhost:5001";
+      let useMockData = false;
 
-          new Chart(document.getElementById("revenueChart"), {
-            type: "bar",
-            data: {
-              labels: users,
-              datasets: [
-                {
-                  label: "Tổng chi tiêu (VNĐ)",
-                  data: revenues,
-                  backgroundColor: "rgba(168, 85, 247, 0.6)",
-                  borderColor: "rgba(168, 85, 247, 1)",
-                  borderWidth: 1,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              plugins: {
-                legend: { position: "top" },
+      function renderDashboard(data) {
+        // 1. Update total orders
+        document.getElementById("totalOrders").innerText = data.total_orders_analyzed;
+
+        // 2. Draw chart
+        const users = data.revenue_by_user.map((item) => `User ${item.customer_id}`);
+        const revenues = data.revenue_by_user.map((item) => item.total_revenue);
+
+        new Chart(document.getElementById("revenueChart"), {
+          type: "bar",
+          data: {
+            labels: users,
+            datasets: [
+              {
+                label: "Tổng chi tiêu (VNĐ)",
+                data: revenues,
+                backgroundColor: "rgba(168, 85, 247, 0.6)",
+                borderColor: "rgba(168, 85, 247, 1)",
+                borderWidth: 1,
               },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  ticks: {
-                    callback: (value) =>
-                      new Intl.NumberFormat("vi-VN").format(value),
-                  },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: "top" },
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: (value) => new Intl.NumberFormat("vi-VN").format(value),
                 },
               },
             },
-          });
+          },
+        });
 
-          // 3. Đổ dữ liệu vào bảng
-          const tbody = document.getElementById("tableBody");
-          tbody.innerHTML = "";
+        // 3. Fill table
+        const tbody = document.getElementById("tableBody");
+        tbody.innerHTML = "";
 
-          const recentOrders = data.recent_orders.slice(0, 10);
+        const recentOrders = data.recent_orders.slice(0, 10);
+        recentOrders.forEach((order) => {
+          const financeStatus = order.finance_status || "CHỜ";
+          const row = `
+            <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
+              <td class="p-3 font-bold text-blue-600">#${order.order_id}</td>
+              <td class="p-3">Sản phẩm ${order.product_id}</td>
+              <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-800">${order.web_status}</span></td>
+              <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">${financeStatus}</span></td>
+            </tr>
+          `;
+          tbody.innerHTML += row;
+        });
 
-          recentOrders.forEach((order) => {
-            const financeStatus =
-              order.finance_status === "Chờ"
-                ? "CHỜ"
-                : order.finance_status || "CHỜ";
-            const row = `
-              <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
-                <td class="p-3 font-bold text-blue-600">#${order.order_id}</td>
-                <td class="p-3">Sản phẩm ${order.product_id}</td>
-                <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-800">${order.web_status}</span></td>
-                <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-purple-100 text-purple-800">${financeStatus}</span></td>
-              </tr>
+        // Show status indicator
+        if (useMockData) {
+          const statusDiv = document.querySelector("[class*='border-green-500']");
+          if (statusDiv) {
+            statusDiv.innerHTML = `
+              <h3 class="text-gray-500 text-sm font-semibold uppercase">Trạng Thái Hệ Thống</h3>
+              <p class="text-sm font-bold text-yellow-600 mt-2 flex items-center gap-2">
+                <i data-lucide="alert-circle"></i> Dùng Mock Data
+              </p>
             `;
-            tbody.innerHTML += row;
-          });
+            lucide.createIcons();
+          }
+        }
+      }
+
+      // ========================================
+      // Try to fetch from API
+      // ========================================
+      fetch(API_BASE_URL + "/api/report", {
+        method: "GET",
+        headers: { apikey: "noah-secret-key" },
+        timeout: 5000,
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.json();
+        })
+        .then((data) => {
+          console.log("[INFO] Loaded data from API");
+          renderDashboard(data);
         })
         .catch((error) => {
-          console.error("Lỗi khi tải dữ liệu:", error);
-          document.getElementById("tableBody").innerHTML =
-            '<tr><td colspan="4" class="p-4 text-center text-red-500">Không thể kết nối đến API Report!</td></tr>';
+          console.warn("[WARN] API not available, using mock data:", error.message);
+          useMockData = true;
+          renderDashboard(MOCK_DATA);
+          
+          // Update table footer
+          const tbody = document.getElementById("tableBody");
+          const footer = document.createElement("tr");
+          footer.innerHTML = `
+            <td colspan="4" class="p-3 text-center text-yellow-600 bg-yellow-50 text-xs">
+              ⚠️ Đang sử dụng dữ liệu mẫu. Hãy kiểm tra API ở http://localhost:5001/health
+            </td>
+          `;
+          tbody.parentElement.appendChild(footer);
         });
     </script>
   </body>
