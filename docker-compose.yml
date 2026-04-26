@@ -83,6 +83,9 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_PASS: ${RABBITMQ_DEFAULT_PASS}
+
+      # Option 4: WebSocket Server URL
+      WS_SERVER_URL: http://websocket-server:5002
     ports:
       - "5000:5000"
     networks:
@@ -132,7 +135,7 @@ services:
       postgres-db:
         condition: service_started
     environment:
-      MYSQL_URL: mysql+mysqlconnector://noah_user:noah_password@mysql-db:3306/webstore_db
+      MYSQL_URL: mysql+mysqlconnector://root:rootpassword@mysql-db:3306/noah_web_store
       POSTGRES_URL: postgresql+psycopg2://finance_user:finance_password@postgres-db:5432/finance_db
     ports:
       - "5001:5001"
@@ -147,9 +150,11 @@ services:
     container_name: noah_dashboard
     depends_on:
       - kong-gateway
+      - websocket-server
     environment:
       KONG_URL: http://kong-gateway:8000
       KONG_API_KEY: noah-secret-key
+      WS_SERVER_URL: http://websocket-server:5002
     ports:
       - "8501:8501"
     networks:
@@ -198,6 +203,32 @@ services:
     networks:
       - noah_network
 
+  # 10. WebSocket Server — Real-Time Event Hub (Option 4)
+  websocket-server:
+    build:
+      context: ./websocket_server
+      dockerfile: Dockerfile
+    container_name: noah_websocket
+    ports:
+      - "5002:5002"
+    environment:
+      WS_PORT: 5002
+    networks:
+      - noah_network
+
+  # 11. Client Storefront — Trang Khách Hàng (Option 5)
+  storefront:
+    build:
+      context: ./storefront
+      dockerfile: Dockerfile
+    container_name: noah_storefront
+    depends_on:
+      - kong-gateway
+    ports:
+      - "3000:3000"
+    networks:
+      - noah_network
+
 networks:
   noah_network:
     driver: bridge
@@ -205,4 +236,4 @@ networks:
 volumes:
   mysql_data:
   postgres_data:
-  rabbitmq_data:
+  rabbitmq_data:

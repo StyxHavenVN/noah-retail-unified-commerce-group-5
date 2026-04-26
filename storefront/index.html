@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="NOAH Retail - Cửa hàng trực tuyến với hệ thống Unified Commerce">
+    <title>NOAH Retail — Cửa Hàng Trực Tuyến</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header" id="main-header">
+        <div class="header-inner">
+            <a href="#" class="logo">🛒 NOAH<span>Retail</span></a>
+            <nav class="nav-links">
+                <a href="#products-section">Sản phẩm</a>
+                <a href="#about-section">Giới thiệu</a>
+            </nav>
+            <button class="cart-btn" id="cart-toggle" onclick="toggleCart()">
+                🛍️ Giỏ hàng
+                <span class="cart-badge" id="cart-badge">0</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- HERO SECTION -->
+    <section class="hero" id="hero-section">
+        <div class="hero-bg"></div>
+        <div class="hero-content">
+            <h1 class="hero-title">
+                <span class="hero-tag">Unified Commerce</span>
+                Mua sắm thông minh.<br>Trải nghiệm liền mạch.
+            </h1>
+            <p class="hero-sub">Hệ thống E-commerce tích hợp đa kênh — CMU-CS 445 NIS Nhóm 5</p>
+            <a href="#products-section" class="hero-cta">Khám phá ngay →</a>
+        </div>
+        <div class="hero-glow"></div>
+    </section>
+
+    <!-- PRODUCTS SECTION -->
+    <section class="products-section" id="products-section">
+        <div class="section-head">
+            <h2>🔥 Sản Phẩm Nổi Bật</h2>
+            <p>Dữ liệu thực từ MySQL Database qua Kong API Gateway</p>
+        </div>
+        <div class="products-toolbar">
+            <input type="text" id="search-input" class="search-box" placeholder="🔍 Tìm kiếm sản phẩm..." oninput="filterProducts()">
+            <select id="sort-select" class="sort-select" onchange="sortProducts()">
+                <option value="default">Mặc định</option>
+                <option value="price-asc">Giá tăng dần</option>
+                <option value="price-desc">Giá giảm dần</option>
+                <option value="name">Tên A-Z</option>
+            </select>
+        </div>
+        <div class="products-grid" id="products-grid">
+            <div class="loading-skeleton" id="loading-skeleton">
+                <div class="skel-card"></div><div class="skel-card"></div>
+                <div class="skel-card"></div><div class="skel-card"></div>
+                <div class="skel-card"></div><div class="skel-card"></div>
+            </div>
+        </div>
+        <div class="load-more-wrap" id="load-more-wrap" style="display:none;">
+            <button class="load-more-btn" id="load-more-btn" onclick="loadMoreProducts()">Xem thêm sản phẩm</button>
+        </div>
+    </section>
+
+    <!-- CART SIDEBAR -->
+    <div class="cart-overlay" id="cart-overlay" onclick="toggleCart()"></div>
+    <aside class="cart-sidebar" id="cart-sidebar">
+        <div class="cart-header">
+            <h3>🛍️ Giỏ Hàng</h3>
+            <button class="cart-close" onclick="toggleCart()">✕</button>
+        </div>
+        <div class="cart-items" id="cart-items">
+            <p class="cart-empty" id="cart-empty">Giỏ hàng trống</p>
+        </div>
+        <div class="cart-footer" id="cart-footer" style="display:none;">
+            <div class="cart-total">
+                <span>Tổng cộng:</span>
+                <span class="total-amount" id="cart-total-amount">0₫</span>
+            </div>
+            <button class="checkout-btn" id="checkout-btn" onclick="showCheckout()">
+                Thanh toán →
+            </button>
+        </div>
+    </aside>
+
+    <!-- CHECKOUT MODAL -->
+    <div class="modal-overlay" id="checkout-overlay" onclick="hideCheckout()"></div>
+    <div class="modal" id="checkout-modal">
+        <div class="modal-header">
+            <h3>📋 Thông Tin Đặt Hàng</h3>
+            <button class="modal-close" onclick="hideCheckout()">✕</button>
+        </div>
+        <form class="checkout-form" id="checkout-form" onsubmit="return placeOrder(event)">
+            <div class="form-group">
+                <label for="customer-name">Họ và tên</label>
+                <input type="text" id="customer-name" required placeholder="Nguyễn Văn A">
+            </div>
+            <div class="form-group">
+                <label for="customer-phone">Số điện thoại</label>
+                <input type="tel" id="customer-phone" required placeholder="0901234567">
+            </div>
+            <div class="form-group">
+                <label for="customer-email">Email</label>
+                <input type="email" id="customer-email" placeholder="email@example.com">
+            </div>
+            <div class="form-group">
+                <label for="customer-address">Địa chỉ giao hàng</label>
+                <textarea id="customer-address" rows="2" required placeholder="123 Đường ABC, Quận 1, TP.HCM"></textarea>
+            </div>
+            <div class="order-summary" id="order-summary"></div>
+            <button type="submit" class="submit-btn" id="submit-btn">
+                <span class="btn-text">🚀 Đặt Hàng</span>
+                <span class="btn-loader" style="display:none;">⏳ Đang xử lý...</span>
+            </button>
+        </form>
+    </div>
+
+    <!-- SUCCESS MODAL -->
+    <div class="modal-overlay" id="success-overlay" onclick="hideSuccess()"></div>
+    <div class="modal success-modal" id="success-modal">
+        <div class="success-icon">✅</div>
+        <h2>Cảm ơn bạn đã mua hàng!</h2>
+        <p class="success-detail" id="success-detail"></p>
+        <p class="success-sub">Đơn hàng đang được xử lý qua hệ thống Unified Commerce.<br>
+            MySQL → RabbitMQ → PostgreSQL</p>
+        <button class="success-btn" onclick="hideSuccess()">Tiếp tục mua sắm</button>
+    </div>
+
+    <!-- ABOUT -->
+    <section class="about-section" id="about-section">
+        <h2>🏗️ Kiến Trúc Hệ Thống</h2>
+        <div class="arch-cards">
+            <div class="arch-card">
+                <div class="arch-icon">🛒</div>
+                <h4>Client Storefront</h4>
+                <p>Giao diện khách hàng truy cập qua Port 3000</p>
+            </div>
+            <div class="arch-card">
+                <div class="arch-icon">🔀</div>
+                <h4>Kong API Gateway</h4>
+                <p>Xác thực API Key, Rate Limiting, CORS</p>
+            </div>
+            <div class="arch-card">
+                <div class="arch-icon">📦</div>
+                <h4>Order API (Flask)</h4>
+                <p>Nhận đơn hàng → MySQL + RabbitMQ</p>
+            </div>
+            <div class="arch-card">
+                <div class="arch-icon">📡</div>
+                <h4>WebSocket Server</h4>
+                <p>Real-time notification tới Dashboard</p>
+            </div>
+            <div class="arch-card">
+                <div class="arch-icon">🐰</div>
+                <h4>RabbitMQ</h4>
+                <p>Message Broker xử lý bất đồng bộ</p>
+            </div>
+            <div class="arch-card">
+                <div class="arch-icon">📊</div>
+                <h4>Dashboard (Streamlit)</h4>
+                <p>Real-time monitoring + Data Stitching</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <p>NOAH Retail — Unified Commerce System | Nhóm 5 — CMU-CS 445 NIS (2026)</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

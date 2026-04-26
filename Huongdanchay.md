@@ -20,14 +20,16 @@ docker-compose up -d --build
 
 | Dịch vụ | URL | Ghi chú |
 |---------|-----|---------|
-| **Dashboard** | http://localhost:8501 | Giao diện chính |
-| **RabbitMQ UI** | http://localhost:15672 | Login: `user` / `password` |
+| **🛒 Client Storefront** | http://localhost:3000 | Trang mua hàng khách hàng (Option 5) |
+| **📊 Dashboard** | http://localhost:8501 | Giao diện quản trị + Real-Time (Option 4) |
+| **🐰 RabbitMQ UI** | http://localhost:15672 | Login: `user` / `password` |
 
 ### API (dùng `curl` hoặc Postman — **KHÔNG mở trên trình duyệt**):
 
 | API | Endpoint | Header bắt buộc |
 |-----|----------|-----------------|
 | **Order API** | `http://localhost:8000/api/orders` | `apikey: noah-secret-key` |
+| **Products API** | `http://localhost:8000/api/products` | `apikey: noah-secret-key` |
 | **Report API** | `http://localhost:8000/api/report` | `apikey: noah-secret-key` |
 
 ### Database (kết nối bằng tool như DBeaver, DataGrip):
@@ -49,10 +51,30 @@ curl -X POST http://localhost:8000/api/orders \
   -d '{"user_id": 10, "product_id": 101, "quantity": 2}'
 ```
 
+**Xem sản phẩm:**
+```bash
+curl http://localhost:8000/api/products -H "apikey: noah-secret-key"
+```
+
 **Xem báo cáo:**
 ```bash
 curl http://localhost:8000/api/report -H "apikey: noah-secret-key"
 ```
+
+## 🔥 Demo Real-Time (Option 4)
+
+1. Mở **Dashboard** tại http://localhost:8501
+2. Quan sát panel **📡 Real-Time Hub** ở đầu trang
+3. Dùng **Postman** hoặc **Client Storefront** bắn đơn hàng liên tục
+4. Số **"Đơn mới (Live)"** trên Dashboard tự tăng + nhấp nháy mà **không cần reload**
+
+## 🛍️ Demo Storefront (Option 5)
+
+1. Mở http://localhost:3000
+2. Duyệt sản phẩm → Bấm **"Thêm vào giỏ"**
+3. Mở giỏ hàng → Bấm **"Thanh toán"**
+4. Điền thông tin → Bấm **"Đặt Hàng"**
+5. Hiện Loading → Thông báo **"Cảm ơn bạn đã mua hàng"** ✅
 
 ## 🛑 Dừng Project
 
@@ -70,7 +92,7 @@ docker-compose down -v       # Dừng + xóa toàn bộ data
 | Build lỗi | `docker-compose build --no-cache` rồi `up -d` |
 | Xem log service | `docker logs <tên_container>` (vd: `docker logs order_api`) |
 
-## 📦 Danh sách 9 Container
+## 📦 Danh sách 11 Container
 
 1. `noah_mysql` — MySQL 8.0 (Web Store DB)
 2. `noah_postgres` — PostgreSQL 15 (Finance DB)
@@ -78,9 +100,11 @@ docker-compose down -v       # Dừng + xóa toàn bộ data
 4. `order_api` — Order API (Flask, port 5000)
 5. `order_worker` — Order Worker (Consumer RabbitMQ)
 6. `report_api` — Report API - Data Stitching (port 5001)
-7. `noah_dashboard` — Streamlit Dashboard (port 8501)
+7. `noah_dashboard` — Streamlit Dashboard (port 8501) + Real-Time WebSocket
 8. `kong_gateway` — Kong API Gateway (port 8000)
 9. `legacy_adapter` — Legacy CSV Adapter
+10. `noah_websocket` — **WebSocket Server (port 5002)** ← Option 4
+11. `noah_storefront` — **Client Storefront (port 3000)** ← Option 5
 
 ---
 *Nhóm 5 - CMU-CS 445 NIS (2026)*
